@@ -1,15 +1,15 @@
-# ---- build ----
-FROM maven:3.9.8-eclipse-temurin-21 AS build
-WORKDIR /workspace
-COPY pom.xml ./
-RUN --mount=type=cache,target=/root/.m2 mvn -q -DskipTests dependency:go-offline
+# ===== Build stage =====
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /app
+COPY pom.xml .
+RUN mvn -q -DskipTests dependency:go-offline
 COPY src ./src
-RUN --mount=type=cache,target=/root/.m2 mvn -q -DskipTests package
+RUN mvn -q -DskipTests package
 
-# ---- runtime ----
+# ===== Runtime stage =====
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-ENV PORT=8080
+COPY --from=build /app/target/*-SNAPSHOT.jar app.jar
 EXPOSE 8080
-COPY --from=build /workspace/target/*-SNAPSHOT.jar /app/app.jar
+ENV PORT=8080
 ENTRYPOINT ["java","-jar","/app/app.jar"]

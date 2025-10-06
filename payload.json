@@ -1,0 +1,12 @@
+{
+  "action": "opened",
+  "issue": {
+    "number": 123,
+    "title": "Webhook validation test",
+    "body": "Triggered by NMemane1"
+  },
+  "repository": {
+    "name": "CMPE272-GitHub-TestRepository-CodeCoven",
+    "owner": { "login": "NMemane1" }
+  }
+}

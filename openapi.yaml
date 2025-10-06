@@ -1,0 +1,210 @@
+openapi: 3.1.0
+info:
+  title: GitHub Issues Gateway (Spring Boot)
+  version: 1.0.0
+servers:
+  - url: http://localhost:{port}
+    variables:
+      port:
+        default: "8080"
+components:
+  securitySchemes:
+    githubToken:
+      type: http
+      scheme: bearer
+  schemas:
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details:
+          type: array
+          items: { type: string }
+    CreateIssueRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        body:  { type: string }
+        labels:
+          type: array
+          items: { type: string }
+    UpdateIssueRequest:
+      type: object
+      properties:
+        title: { type: string }
+        body:  { type: string }
+        state:
+          type: string
+          enum: [open, closed]
+    CommentRequest:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string }
+    IssueResponse:
+      type: object
+      properties:
+        number:     { type: integer }
+        html_url:   { type: string }
+        state:      { type: string }
+        title:      { type: string }
+        body:       { type: string }
+        labels:
+          type: array
+          items: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    CommentResponse:
+      type: object
+      properties:
+        id:        { type: integer }
+        body:      { type: string }
+        user:      { type: string }
+        created_at:{ type: string, format: date-time }
+        html_url:  { type: string }
+    WebhookEvent:
+      type: object
+      properties:
+        id:           { type: string }
+        event:        { type: string, enum: [issues, issue_comment, ping] }
+        action:       { type: string }
+        issue_number: { type: integer }
+        timestamp:    { type: string, format: date-time }
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+paths:
+  /issues:
+    post:
+      summary: Create an issue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateIssueRequest' }
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    get:
+      summary: List issues
+      parameters:
+        - in: query
+          name: state
+          schema: { type: string, enum: [open, closed, all] }
+          default: open
+        - in: query
+          name: labels
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: per_page
+          schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+      responses:
+        '200':
+          description: OK
+          headers:
+            Link: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/IssueResponse' }
+  /issues/{number}:
+    parameters:
+      - in: path
+        name: number
+        required: true
+        schema: { type: integer }
+    get:
+      summary: Get single issue
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      summary: Update issue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateIssueRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IssueResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /issues/{number}/comments:
+    parameters:
+      - in: path
+        name: number
+        required: true
+        schema: { type: integer }
+    post:
+      summary: Add comment to issue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommentRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommentResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /webhook:
+    post:
+      summary: GitHub webhook receiver (HMAC verified)
+      responses:
+        '204': { description: No Content }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /events:
+    get:
+      summary: Recent webhook deliveries
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WebhookEvent' }
